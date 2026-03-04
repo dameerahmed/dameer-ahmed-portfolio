@@ -1,0 +1,62 @@
+# ── Python / FastAPI ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+.env
+
+# Testing artifacts (these were debug scripts, not production code)
+test_*.py
+check_*.py
+list_routes.py
+app_routes.json
+openapi.json
+test_image.png
+test_res.json
+migrate_address.py
+init_db.py
+
+# Alembic (keep the folder, ignore auto-generated stuff)
+alembic/versions/*.pyc
+
+# uv / pip lock files (environment-specific)
+uv.lock
+.python-version
+
+# ── Node / Next.js ────────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Env files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ── Editor / OS ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+*.log
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+*.pid

@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+
+# Debug / temp scripts (not part of the app)
+test_*.py
+check_*.py
+app_routes.json
+openapi.json
+test_image.png
+test_res.json
+migrate_address.py
+init_db.py
+list_routes.py
