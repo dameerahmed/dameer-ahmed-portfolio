@@ -6,7 +6,7 @@ import { toast } from "react-hot-toast";
 import { motion } from "framer-motion";
 import { getContactIcon } from "@/lib/utils";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 type SocialLink = { id: number, platform: string, url: string };
 type Profile = { name: string, bio: string, email?: string, phone?: string, address?: string, city?: string, country?: string };

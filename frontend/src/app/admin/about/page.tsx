@@ -8,7 +8,7 @@ import { getDeviceId } from "@/lib/utils";
 import { AdminSection, AdminField } from "@/components/admin/AdminUI";
 import ScrollSelector from "@/components/admin/ScrollSelector";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 const IconMap: { [key: string]: any } = {
     Code, Zap, Cpu, Settings, Database, Globe, Layers, Brain, Smartphone, Terminal, Shield, Cloud, Activity, Server, Layout, Heart, Languages

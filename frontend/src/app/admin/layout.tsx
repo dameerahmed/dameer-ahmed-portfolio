@@ -9,8 +9,7 @@ import {
 } from "lucide-react";
 import { getDeviceId } from "@/lib/utils";
 import { toast } from "react-hot-toast";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();

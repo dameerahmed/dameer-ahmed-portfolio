@@ -9,7 +9,7 @@ import { AdminSection, AdminField } from "@/components/admin/AdminUI";
 import ImageEditorModal from "@/components/ImageEditorModal";
 import Dashboard from "@/components/admin/Dashboard";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 export default function AdminHome() {
     const router = useRouter();

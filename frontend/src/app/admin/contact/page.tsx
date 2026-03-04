@@ -7,7 +7,7 @@ import { Trash2, Edit3, Link as LinkIcon, Plus, Mail, Phone, Check, X, MapPin, S
 import { getDeviceId, getContactIcon } from "@/lib/utils";
 import { AdminSection, AdminEmpty } from "@/components/admin/AdminUI";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 function getAuthHeaders() {
     return {
@@ -57,10 +57,10 @@ export default function AdminContact() {
     const loadData = useCallback(async () => {
         try {
             const [socialsRes, emailsRes, phonesRes, profileRes] = await Promise.all([
-                fetch(`${API_BASE}/admin/socials`, { headers: { "X-Device-ID": getDeviceId() }, credentials: "include" }),
-                fetch(`${API_BASE}/admin/contact/emails`, { headers: { "X-Device-ID": getDeviceId() }, credentials: "include" }),
-                fetch(`${API_BASE}/admin/contact/phones`, { headers: { "X-Device-ID": getDeviceId() }, credentials: "include" }),
-                fetch(`${API_BASE}/admin/profile`, { headers: { "X-Device-ID": getDeviceId() }, credentials: "include" }),
+                fetch(`${API}/admin/socials`, { headers: { "X-Device-ID": getDeviceId() }, credentials: "include" }),
+                fetch(`${API}/admin/contact/emails`, { headers: { "X-Device-ID": getDeviceId() }, credentials: "include" }),
+                fetch(`${API}/admin/contact/phones`, { headers: { "X-Device-ID": getDeviceId() }, credentials: "include" }),
+                fetch(`${API}/admin/profile`, { headers: { "X-Device-ID": getDeviceId() }, credentials: "include" }),
             ]);
 
             const socialsData = await socialsRes.json();
@@ -88,7 +88,7 @@ export default function AdminContact() {
     const saveLocation = async () => {
         setIsSavingLocation(true);
         try {
-            const res = await fetch(`${API_BASE}/admin/profile`, {
+            const res = await fetch(`${API}/admin/profile`, {
                 method: "PUT",
                 headers: getAuthHeaders(),
                 credentials: "include",
@@ -114,7 +114,7 @@ export default function AdminContact() {
             return;
         }
         try {
-            const res = await fetch(`${API_BASE}/admin/contact/emails`, {
+            const res = await fetch(`${API}/admin/contact/emails`, {
                 method: "POST", headers: getAuthHeaders(), credentials: "include",
                 body: JSON.stringify(newEmail)
             });
@@ -134,7 +134,7 @@ export default function AdminContact() {
 
     const deleteEmail = async (id: number) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/contact/emails/${id}`, { method: "DELETE", headers: getAuthHeaders(), credentials: "include" });
+            const res = await fetch(`${API}/admin/contact/emails/${id}`, { method: "DELETE", headers: getAuthHeaders(), credentials: "include" });
             if (res.ok) {
                 setEmails(prev => prev.filter(e => e.id !== id));
                 toast.success("Email deleted");
@@ -148,7 +148,7 @@ export default function AdminContact() {
 
     const updateEmail = async (id: number) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/contact/emails/${id}`, {
+            const res = await fetch(`${API}/admin/contact/emails/${id}`, {
                 method: "PUT", headers: getAuthHeaders(), credentials: "include",
                 body: JSON.stringify(editEmailForm)
             });
@@ -171,7 +171,7 @@ export default function AdminContact() {
             return;
         }
         try {
-            const res = await fetch(`${API_BASE}/admin/contact/phones`, {
+            const res = await fetch(`${API}/admin/contact/phones`, {
                 method: "POST", headers: getAuthHeaders(), credentials: "include",
                 body: JSON.stringify({ number: fullNumber, label: newPhone.label })
             });
@@ -191,7 +191,7 @@ export default function AdminContact() {
 
     const deletePhone = async (id: number) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/contact/phones/${id}`, { method: "DELETE", headers: getAuthHeaders(), credentials: "include" });
+            const res = await fetch(`${API}/admin/contact/phones/${id}`, { method: "DELETE", headers: getAuthHeaders(), credentials: "include" });
             if (res.ok) {
                 setPhones(prev => prev.filter(p => p.id !== id));
                 toast.success("Phone deleted");
@@ -205,7 +205,7 @@ export default function AdminContact() {
 
     const updatePhone = async (id: number) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/contact/phones/${id}`, {
+            const res = await fetch(`${API}/admin/contact/phones/${id}`, {
                 method: "PUT", headers: getAuthHeaders(), credentials: "include",
                 body: JSON.stringify(editPhoneForm)
             });
@@ -239,7 +239,7 @@ export default function AdminContact() {
         const payload = { ...newSocial, platform, logo_url };
 
         try {
-            const res = await fetch(`${API_BASE}/admin/socials`, {
+            const res = await fetch(`${API}/admin/socials`, {
                 method: "POST", headers: getAuthHeaders(), credentials: "include",
                 body: JSON.stringify(payload)
             });
@@ -259,7 +259,7 @@ export default function AdminContact() {
 
     const deleteSocial = async (id: number) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/socials/${id}`, { method: "DELETE", headers: getAuthHeaders(), credentials: "include" });
+            const res = await fetch(`${API}/admin/socials/${id}`, { method: "DELETE", headers: getAuthHeaders(), credentials: "include" });
             if (res.ok) {
                 setSocials(prev => prev.filter(s => s.id !== id));
                 toast.success("Social deleted");
@@ -273,7 +273,7 @@ export default function AdminContact() {
 
     const updateSocial = async (id: number) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/socials/${id}`, {
+            const res = await fetch(`${API}/admin/socials/${id}`, {
                 method: "PUT", headers: getAuthHeaders(), credentials: "include",
                 body: JSON.stringify(editSocialForm)
             });

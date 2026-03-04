@@ -6,8 +6,7 @@ import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, ShieldCheck, ArrowRight, User, KeyRound } from "lucide-react";
 import { getDeviceId } from "@/lib/utils";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 export default function LoginPage() {
     const router = useRouter();

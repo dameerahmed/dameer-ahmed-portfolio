@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Shield, Lock, Eye, EyeOff, CheckCircle2, KeyRound, LogOut } from "lucide-react";
 import { getDeviceId } from "@/lib/utils";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+import { API } from "@/lib/api";
 
 export default function SecurityPage() {
     const router = useRouter();

@@ -11,7 +11,7 @@ import { getDeviceId } from "@/lib/utils";
 import { motion } from "framer-motion";
 import ImageEditorModal from "@/components/ImageEditorModal";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 function getAuthHeaders() {
     return {

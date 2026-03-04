@@ -1,4 +1,17 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const getApiBaseUrl = () => {
+    let url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    // Remove trailing slashes
+    url = url.replace(/\/+$/, "");
+    // If it's just a slash or empty, fallback to localhost for safety (or handle as relative)
+    if (!url || url === "/") {
+        // In SSR, relative URLs don't work, so we MUST have a domain
+        return "http://localhost:8000/api";
+    }
+    return url;
+};
+
+const API_BASE_URL = getApiBaseUrl();
+export const API = API_BASE_URL;
 
 // Using no-store to ensure admin changes reflect immediately on the customer portal
 export async function fetchProjects() {

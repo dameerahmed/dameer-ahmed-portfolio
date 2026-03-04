@@ -6,7 +6,7 @@ import { Trash2, MessageSquare, CheckCircle, Flag } from "lucide-react";
 import { getDeviceId } from "@/lib/utils";
 import { AdminSection, AdminEmpty } from "@/components/admin/AdminUI";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+import { API } from "@/lib/api";
 
 function getAuthHeaders() {
     return {
