@@ -2,6 +2,10 @@
 
 A premium, full-stack portfolio with a centralized management dashboard. Built with a focus on performance, security, and futuristic aesthetics.
 
+## 🔗 Live Links
+- **Frontend:** [https://dameer-ahmed-portfolio.vercel.app/](https://dameer-ahmed-portfolio.vercel.app/)
+- **Backend API:** [https://dameer-ahmed-portfolio.onrender.com/](https://dameer-ahmed-portfolio.onrender.com/)
+
 ## 🚀 Core Features
 - **Dynamic Content:** Update Projects, Skills, and Bio in real-time.
 - **Admin Dashboard:** Secure portal with OTP-based 2FA.
