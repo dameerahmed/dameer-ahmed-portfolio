@@ -130,7 +130,7 @@ async def verify_otp(otp_data: schemas.OTPVerify, db: AsyncSession = Depends(get
         value=access_token,
         httponly=True,
         secure=is_production,
-        samesite="lax",
+        samesite="none" if is_production else "lax",
         max_age=7 * 24 * 60 * 60  # 7 days
     )
     
