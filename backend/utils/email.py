@@ -12,6 +12,7 @@ def send_otp_email(to_email: str, otp_code: str):
         return True
 
     try:
+        print(f"DEBUG: Attempting to send OTP email to {to_email}...")
         msg = MIMEMultipart()
         msg['From'] = settings.SMTP_USER
         msg['To'] = to_email
@@ -31,13 +32,17 @@ def send_otp_email(to_email: str, otp_code: str):
         """
         msg.attach(MIMEText(body, 'html'))
 
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        print(f"DEBUG: Connecting to smtp.gmail.com:587...")
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
             server.starttls()
+            print(f"DEBUG: Logging in as {settings.SMTP_USER}...")
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            print(f"DEBUG: Sending message...")
             server.send_message(msg)
+        print(f"SUCCESS: OTP email sent to {to_email}")
         return True
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        print(f"ERROR: Failed to send email to {to_email}: {str(e)}")
         return False
 
 def generate_otp():

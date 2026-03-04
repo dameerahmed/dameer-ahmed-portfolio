@@ -31,13 +31,15 @@ async def startup():
         await conn.run_sync(Base.metadata.create_all)
 
 # Configure CORS
+# We allow the main domain and all vercel.app subdomains for preview/branch deploys
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         settings.FRONTEND_URL,
         "http://localhost:3000",
-        "http://127.0.0.1:3000"
+        "http://127.0.0.1:3000",
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow all Vercel previews
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Device-ID"],

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from pydantic import BaseModel
@@ -27,7 +27,7 @@ MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_SECONDS = 60
 
 @router.post("/login")
-async def login(login_data: schemas.LoginData, request: Request, db: AsyncSession = Depends(get_db)):
+async def login(login_data: schemas.LoginData, request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     client_ip = request.client.host if request.client else "unknown"
     now = datetime.now(timezone.utc)
 
@@ -78,10 +78,8 @@ async def login(login_data: schemas.LoginData, request: Request, db: AsyncSessio
     db.add(db_otp)
     await db.commit()
 
-    # 3. Send Email
-    email_sent = send_otp_email(settings.ADMIN_EMAIL, otp_code)
-    if not email_sent:
-        raise HTTPException(status_code=500, detail="Failed to send OTP email")
+    # 3. Send Email in background to prevent timeout
+    background_tasks.add_task(send_otp_email, settings.ADMIN_EMAIL, otp_code)
 
     return {"status": "otp_sent", "message": "Check your email for OTP"}
 
@@ -189,7 +187,7 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 @router.post("/forgot-password")
-async def forgot_password(db: AsyncSession = Depends(get_db)):
+async def forgot_password(background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     otp_code = generate_otp()
     expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=10)
 
@@ -199,9 +197,8 @@ async def forgot_password(db: AsyncSession = Depends(get_db)):
     db.add(db_otp)
     await db.commit()
 
-    email_sent = send_otp_email(settings.ADMIN_EMAIL, otp_code)
-    if not email_sent:
-        raise HTTPException(status_code=500, detail="Failed to send reset email")
+    # Send reset email in background
+    background_tasks.add_task(send_otp_email, settings.ADMIN_EMAIL, otp_code)
 
     return {"status": "otp_sent", "message": f"Reset code sent to your admin email"}
 
