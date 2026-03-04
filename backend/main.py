@@ -1,3 +1,8 @@
+import os
+# Fix: Render environment sometimes has an invalid/empty CLOUDINARY_URL that crashes the app on import.
+if "CLOUDINARY_URL" in os.environ and not os.environ["CLOUDINARY_URL"].startswith("cloudinary://"):
+    del os.environ["CLOUDINARY_URL"]
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
