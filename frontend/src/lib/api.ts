@@ -1,11 +1,14 @@
 const getApiBaseUrl = () => {
-    let url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-    // Remove trailing slashes
+    let url = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").trim();
+    // Remove all trailing slashes
     url = url.replace(/\/+$/, "");
-    // If it's just a slash or empty, fallback to localhost for safety (or handle as relative)
-    if (!url || url === "/") {
-        // In SSR, relative URLs don't work, so we MUST have a domain
+    // If empty or root, fallback to localhost for safety
+    if (!url || url === "/" || url === ".") {
         return "http://localhost:8000/api";
+    }
+    // Force append /api if missing from the end
+    if (!url.endsWith("/api")) {
+        url = `${url}/api`;
     }
     return url;
 };
