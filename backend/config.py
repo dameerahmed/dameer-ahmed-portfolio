@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "your-email@gmail.com"
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
+    RESEND_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
