@@ -1,4 +1,4 @@
-import { fetchHomeContent, fetchTechStack, fetchProfile, fetchSocials } from "@/lib/api";
+import { fetchHomeBootstrap } from "@/lib/api";
 import HomeHero from "@/components/HomeHero";
 
 export const metadata = {
@@ -21,23 +21,17 @@ export default async function Home() {
   ];
 
   let portraitUrl = "";
+  let socialLinks: any = {};
 
   try {
-    const [contentData, techData, profileData, socialsData] = await Promise.all([
-      fetchHomeContent(),
-      fetchTechStack(),
-      fetchProfile(),
-      fetchSocials().catch(() => [])
-    ]);
+    const data = await fetchHomeBootstrap();
 
-    if (contentData) content = contentData;
-    if (techData && techData.length > 0) techStack = techData;
-    if (profileData) portraitUrl = profileData.profile_pic;
+    if (data.content) content = data.content;
+    if (data.tech_stack && data.tech_stack.length > 0) techStack = data.tech_stack;
+    if (data.profile) portraitUrl = data.profile.profile_pic;
 
-    // Map socials array to a usable object for HomeHero
-    const socialLinks: any = {};
-    if (socialsData) {
-      socialsData.forEach((s: any) => {
+    if (data.socials) {
+      data.socials.forEach((s: any) => {
         socialLinks[s.platform.toLowerCase()] = s.url;
       });
     }
@@ -57,7 +51,7 @@ export default async function Home() {
         initialContent={content}
         techStack={techStack}
         portraitUrl={portraitUrl}
-        socialLinks={{}}
+        socialLinks={socialLinks}
       />
     );
   }

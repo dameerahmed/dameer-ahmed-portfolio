@@ -16,6 +16,12 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 export const API = API_BASE_URL;
 
+export async function fetchHomeBootstrap() {
+    const res = await fetch(`${API_BASE_URL}/bootstrap/home`, { cache: 'no-store' });
+    if (!res.ok) throw new Error("Failed to fetch home bootstrap data");
+    return res.json();
+}
+
 // Using no-store to ensure admin changes reflect immediately on the customer portal
 export async function fetchProjects() {
     const res = await fetch(`${API_BASE_URL}/projects`, { cache: 'no-store' });

@@ -15,6 +15,37 @@ class ContactForm(BaseModel):
     email: EmailStr
     message: str = Field(..., min_length=5, max_length=2000)
 
+@router.get("/bootstrap/home")
+async def get_home_bootstrap(db: AsyncSession = Depends(get_db)):
+    # Fetch Home Content (with fallback)
+    content_res = await db.execute(select(models.SiteContent).limit(1))
+    content = content_res.scalars().first()
+    if not content:
+        content = {
+            "hero_title": "Dameer Ahmed Malik",
+            "typing_tags": ["AI Agent Developer", "Data Scientist", "ML Engineer"],
+            "hero_description": "Building intelligent systems and autonomous AI agents that transform data into decisions. Specializing in scalable ML pipelines and next-gen AI solutions."
+        }
+    
+    # Fetch Tech Stack
+    tech_res = await db.execute(select(models.TechStack).order_by(models.TechStack.years_of_experience.desc()))
+    tech_stack = tech_res.scalars().all()
+    
+    # Fetch Profile
+    profile_res = await db.execute(select(models.SiteMetadata).limit(1))
+    profile = profile_res.scalars().first()
+    
+    # Fetch Socials
+    socials_res = await db.execute(select(models.SocialLink).order_by(models.SocialLink.order.asc()))
+    socials = socials_res.scalars().all()
+    
+    return {
+        "content": content,
+        "tech_stack": tech_stack,
+        "profile": profile,
+        "socials": socials
+    }
+
 @router.get("/profile")
 async def get_profile(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.SiteMetadata).limit(1))
