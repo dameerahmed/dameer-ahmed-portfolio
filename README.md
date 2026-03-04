@@ -2,8 +2,6 @@
 
 A premium, full-stack portfolio with a centralized management dashboard. Built with a focus on performance, security, and futuristic aesthetics.
 
-![Banner](banner.png)
-
 ## 🚀 Core Features
 - **Dynamic Content:** Update Projects, Skills, and Bio in real-time.
 - **Admin Dashboard:** Secure portal with OTP-based 2FA.
