@@ -180,7 +180,7 @@ async def verify_otp(otp_data: schemas.OTPVerify, request: Request, db: AsyncSes
     
     return response
 
-@router.get("/admin/sessions")
+@router.get("/sessions")
 async def get_active_sessions(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
     current_device_id = current_admin.get("device_id")
     
@@ -213,7 +213,7 @@ async def get_active_sessions(db: AsyncSession = Depends(get_db), current_admin:
         })
     return serialized
 
-@router.delete("/admin/sessions/{session_id}")
+@router.delete("/sessions/{session_id}")
 async def terminate_session(session_id: int, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
     # 1. Check requester status
     curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
@@ -241,7 +241,7 @@ async def terminate_session(session_id: int, db: AsyncSession = Depends(get_db),
     await db.commit()
     return {"message": "Session terminated"}
 
-@router.post("/admin/sessions/terminate-others")
+@router.post("/sessions/terminate-others")
 async def terminate_other_sessions(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
     # 1. Restriction: Only primary can use "Terminate All"
     curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
@@ -262,7 +262,7 @@ async def terminate_other_sessions(db: AsyncSession = Depends(get_db), current_a
     await db.commit()
     return {"message": "Other sessions terminated"}
 
-@router.put("/admin/sessions/{session_id}/name")
+@router.put("/sessions/{session_id}/name")
 async def update_device_name(session_id: int, name_data: dict, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
     result = await db.execute(select(models.AdminSession).where(models.AdminSession.id == session_id))
     session = result.scalars().first()
@@ -273,7 +273,7 @@ async def update_device_name(session_id: int, name_data: dict, db: AsyncSession 
     await db.commit()
     return {"message": "Device name updated"}
 
-@router.put("/admin/sessions/{session_id}/promote")
+@router.put("/sessions/{session_id}/promote")
 async def promote_session(session_id: int, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
     # 1. Verify that the user doing the promotion is ALREADY on a protected device
     # (Or if it's the very first time, handled in verify_otp)
@@ -293,7 +293,7 @@ async def promote_session(session_id: int, db: AsyncSession = Depends(get_db), c
     await db.commit()
     return {"message": "Device promoted to Primary"}
 
-@router.put("/admin/sessions/{session_id}/demote")
+@router.put("/sessions/{session_id}/demote")
 async def demote_session(session_id: int, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
     # You can only demote yourself if you are protected, or another if you are protected
     curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
@@ -311,7 +311,7 @@ async def demote_session(session_id: int, db: AsyncSession = Depends(get_db), cu
     await db.commit()
     return {"message": "Primary status removed"}
 
-@router.get("/admin/recovery/get-key")
+@router.get("/recovery/get-key")
 async def get_recovery_key(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
     import secrets
     from auth import get_password_hash
@@ -346,7 +346,7 @@ async def get_recovery_key(db: AsyncSession = Depends(get_db), current_admin: di
         "warning": "IMPORTANT: Write this down! This will NOT be shown again. Use this to regain control if your phone is lost."
     }
 
-@router.post("/admin/recovery/use-key")
+@router.post("/recovery/use-key")
 async def use_recovery_key(data: dict, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
     from auth import verify_password
     raw_key = data.get("key")
