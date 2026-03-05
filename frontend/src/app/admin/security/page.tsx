@@ -22,9 +22,8 @@ export default function AdminSecurity() {
     const [isLoading, setIsLoading] = useState(true);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [newName, setNewName] = useState("");
-
-    const [editingId, setEditingId] = useState<number | null>(null);
-    const [newName, setNewName] = useState("");
+    const [newSecretCode, setNewSecretCode] = useState("");
+    const [isUpdatingCode, setIsUpdatingCode] = useState(false);
 
     const fetchSessions = async () => {
         try {
@@ -76,6 +75,33 @@ export default function AdminSecurity() {
             }
         } catch (error) {
             toast.error("Failed to terminate sessions");
+        }
+    };
+
+    const updateSecretCode = async () => {
+        if (!newSecretCode || newSecretCode.length < 8) {
+            return toast.error("Code must be at least 8 characters");
+        }
+
+        setIsUpdatingCode(true);
+        try {
+            const res = await fetchWithAuth(`${API}/admin/recovery/update-code`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ new_code: newSecretCode.toUpperCase() })
+            });
+
+            if (res.ok) {
+                toast.success("Master Secret Code Updated!");
+                setNewSecretCode("");
+            } else {
+                const err = await res.json();
+                toast.error(err.detail || "Update failed");
+            }
+        } catch (error) {
+            toast.error("Network error updating code");
+        } finally {
+            setIsUpdatingCode(false);
         }
     };
 
@@ -141,7 +167,40 @@ export default function AdminSecurity() {
                     </button>
                 </div>
 
-                {/* 3. Emergency Rescue Form removed - integrated into Login */}
+                {/* 3. Super Admin Specialized Operations */}
+                {onProtectedDevice && (
+                    <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-[2.5rem] p-8 space-y-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                                <Key className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-sm font-bold m-0">Master Secret Code Operations</h4>
+                                <p className="text-[10px] text-zinc-500">Rotate the global recovery key used to authorize Super Admin devices.</p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row gap-4 items-end">
+                            <div className="flex-1 space-y-2 w-full">
+                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">New Secret Code</label>
+                                <input
+                                    type="text"
+                                    value={newSecretCode}
+                                    onChange={e => setNewSecretCode(e.target.value.toUpperCase())}
+                                    placeholder="Enter new master key (min. 8 chars)"
+                                    className="w-full bg-black/40 border border-indigo-500/20 rounded-2xl p-4 text-white font-mono text-sm outline-none focus:border-indigo-500 transition-all"
+                                />
+                            </div>
+                            <button
+                                onClick={updateSecretCode}
+                                disabled={isUpdatingCode}
+                                className="h-[52px] px-8 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-[0_10px_20px_rgba(99,102,241,0.2)] active:scale-95"
+                            >
+                                {isUpdatingCode ? "Updating..." : "Authorize Rotation"}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* 4. Sessions List */}
                 <div className="space-y-4">

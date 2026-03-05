@@ -285,6 +285,35 @@ async def update_device_name(session_id: int, name_data: dict, db: AsyncSession 
 
 @router.post("/logout")
 async def logout(request: Request, db: AsyncSession = Depends(get_db)):
+    # ... logout logic ...
+    pass
+
+
+@router.put("/recovery/update-code")
+async def update_recovery_code(data: dict, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    from auth import get_password_hash
+    new_code = data.get("new_code")
+    if not new_code or len(new_code) < 8:
+        raise HTTPException(status_code=400, detail="New Secret Code must be at least 8 characters long.")
+
+    # 1. Restriction: Only Super Admins can update the code
+    curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
+    current_session = curr_sess_res.scalars().first()
+    
+    if not current_session or not current_session.is_protected:
+        raise HTTPException(status_code=403, detail="Only a Super Admin session can update the Master Secret Code.")
+
+    # 2. Update code for admin user
+    user_res = await db.execute(select(models.AdminUser).where(models.AdminUser.username == settings.ADMIN_USERNAME))
+    admin_user = user_res.scalars().first()
+    
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="Admin user not found.")
+
+    admin_user.recovery_key = get_password_hash(new_code)
+    await db.commit()
+    
+    return {"message": "Master Secret Code updated successfully."}
     # Try to find and deactivate the session
     token = request.cookies.get("admin_session")
     if not token:
