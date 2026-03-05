@@ -47,15 +47,27 @@ export default function AdminSecurity() {
     }, []);
 
     const terminateSession = async (id: number) => {
-        if (!confirm("Are you sure you want to terminate this session? The device will be logged out immediately.")) return;
+        const targetSession = sessions.find(s => s.id === id);
+        const isSelf = targetSession?.is_current;
+
+        if (!confirm(isSelf
+            ? "Are you sure you want to terminate YOUR OWN session? You will be logged out immediately."
+            : "Are you sure you want to terminate this session? The device will be logged out immediately."
+        )) return;
 
         try {
             const res = await fetchWithAuth(`${API}/admin/sessions/${id}`, {
                 method: "DELETE"
             });
             if (res.ok) {
-                toast.success("Session terminated");
-                fetchSessions();
+                if (isSelf) {
+                    toast.success("Current session closed. Redirecting...");
+                    localStorage.removeItem("admin_token");
+                    window.location.href = "/login?reason=self_terminated";
+                } else {
+                    toast.success("Session terminated");
+                    fetchSessions();
+                }
             } else {
                 const err = await res.json();
                 toast.error(err.detail || "Failed to terminate session");

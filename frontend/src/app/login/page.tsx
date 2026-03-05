@@ -27,9 +27,13 @@ export default function LoginPage() {
         const reason = params.get("reason");
         if (reason === "session_ended") {
             toast.error("Session terminated or expired. Please login again.", {
-                id: "session-error" // Prevent duplicates
+                id: "session-error"
             });
-            // Clean URL
+            router.replace("/login");
+        } else if (reason === "self_terminated") {
+            toast.success("Session closed successfully. See you soon!", {
+                id: "self-terminate-success"
+            });
             router.replace("/login");
         }
     }, [router]);
