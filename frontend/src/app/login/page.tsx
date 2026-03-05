@@ -15,8 +15,10 @@ export default function LoginPage() {
     const [formData, setFormData] = useState({
         username: "",
         password: "",
-        otp: ""
+        otp: "",
+        secretCode: ""
     });
+    const [showSecretField, setShowSecretField] = useState(false);
 
     // Device ID check
     const deviceId = getDeviceId();
@@ -58,7 +60,8 @@ export default function LoginPage() {
                 credentials: "include",
                 body: JSON.stringify({
                     code: formData.otp,
-                    device_id: deviceId
+                    device_id: deviceId,
+                    secret_code: formData.secretCode || null
                 }),
             });
 
@@ -184,6 +187,34 @@ export default function LoginPage() {
                                         autoFocus
                                     />
                                     <p className="text-[10px] text-zinc-600 font-mono text-center">Tied to Device ID: <span className="text-zinc-500">{deviceId.substring(0, 8)}...</span></p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {!showSecretField ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowSecretField(true)}
+                                            className="w-full py-2 text-[10px] font-mono text-zinc-600 hover:text-indigo-400 transition-colors uppercase tracking-widest border border-dashed border-zinc-800 rounded-lg"
+                                        >
+                                            + Add Master Secret Code (Optional)
+                                        </button>
+                                    ) : (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: "auto" }}
+                                            className="space-y-2 bg-indigo-500/5 p-4 rounded-xl border border-indigo-500/10"
+                                        >
+                                            <label className="text-[10px] font-mono text-indigo-400 uppercase tracking-[0.2em] ml-1">Master Secret Code</label>
+                                            <input
+                                                type="password"
+                                                value={formData.secretCode}
+                                                onChange={(e) => setFormData({ ...formData, secretCode: e.target.value.toUpperCase() })}
+                                                className="w-full bg-[#080810] border border-indigo-500/30 rounded-lg py-2.5 px-3 text-white placeholder:text-zinc-800 focus:outline-none focus:border-indigo-500 transition-all font-mono text-sm"
+                                                placeholder="FOR SUPER-ADMIN ACCESS"
+                                            />
+                                            <p className="text-[9px] text-zinc-600 italic">Enter your secret key to gain full control over all devices.</p>
+                                        </motion.div>
+                                    )}
                                 </div>
                                 <div className="flex flex-col gap-3">
                                     <button

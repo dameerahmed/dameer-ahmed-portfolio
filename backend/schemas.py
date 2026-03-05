@@ -8,6 +8,7 @@ class LoginData(BaseModel):
 class OTPVerify(BaseModel):
     code: str = Field(..., min_length=6, max_length=6, pattern=r'^\d{6}$')
     device_id: str = Field(..., min_length=1, max_length=256)
+    secret_code: Optional[str] = None
 
 class SiteContentBase(BaseModel):
     hero_title: str

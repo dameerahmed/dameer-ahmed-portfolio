@@ -23,10 +23,8 @@ export default function AdminSecurity() {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [newName, setNewName] = useState("");
 
-    // Recovery States
-    const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
-    const [showRescueForm, setShowRescueForm] = useState(false);
-    const [rescueKeyInput, setRescueKeyInput] = useState("");
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [newName, setNewName] = useState("");
 
     const fetchSessions = async () => {
         try {
@@ -81,78 +79,6 @@ export default function AdminSecurity() {
         }
     };
 
-    const generateRecoveryKey = async () => {
-        try {
-            const res = await fetchWithAuth(`${API}/admin/recovery/get-key`);
-            const data = await res.json();
-            if (res.ok && data.status === "success") {
-                setRecoveryKey(data.raw_key);
-            } else {
-                toast.error(data.message || "Failed to generate key");
-            }
-        } catch (error) {
-            toast.error("Error generating recovery key");
-        }
-    };
-
-    const handleRescueReset = async () => {
-        if (!rescueKeyInput) return toast.error("Please enter the recovery key");
-
-        try {
-            const res = await fetchWithAuth(`${API}/admin/recovery/use-key`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ key: rescueKeyInput })
-            });
-            if (res.ok) {
-                toast.success("EMERGENCY RESET SUCCESSFUL: This is now your primary device.");
-                setShowRescueForm(false);
-                setRescueKeyInput("");
-                fetchSessions();
-            } else {
-                const err = await res.json();
-                toast.error(err.detail || "Invalid recovery key");
-            }
-        } catch (error) {
-            toast.error("Rescue operation failed");
-        }
-    };
-
-    const promoteToPrimary = async (id: number) => {
-        if (!confirm("Are you sure you want to lock this device as Primary?")) return;
-
-        try {
-            const res = await fetchWithAuth(`${API}/admin/sessions/${id}/promote`, {
-                method: "PUT"
-            });
-            if (res.ok) {
-                toast.success("Device promoted to Primary");
-                fetchSessions();
-            } else {
-                const err = await res.json();
-                toast.error(err.detail || "Promotion failed");
-            }
-        } catch (error) {
-            toast.error("Promotion failed");
-        }
-    };
-
-    const demoteFromPrimary = async (id: number) => {
-        if (!confirm("Remove Primary status from this device?")) return;
-
-        try {
-            const res = await fetchWithAuth(`${API}/admin/sessions/${id}/demote`, {
-                method: "PUT"
-            });
-            if (res.ok) {
-                toast.success("Primary status removed");
-                fetchSessions();
-            }
-        } catch (error) {
-            toast.error("Demotion failed");
-        }
-    };
-
     const updateName = async (id: number) => {
         try {
             const res = await fetchWithAuth(`${API}/admin/sessions/${id}/name`, {
@@ -204,8 +130,7 @@ export default function AdminSecurity() {
                     <div className="flex-1 text-center md:text-left space-y-2">
                         <h3 className="text-xl font-black italic tracking-tight">Active Digital Footprint</h3>
                         <p className="text-zinc-400 text-xs font-medium leading-relaxed max-w-md">
-                            Primary devices are **Locked** and cannot be logged out by others.
-                            {onProtectedDevice ? " You are on a Primary device; you can authorize new sessions." : " Log in on your primary phone to manage other devices."}
+                            {onProtectedDevice ? "You are logged in as SUPER ADMIN. All devices are visible." : "You are in Restricted View. Only your current device is visible."}
                         </p>
                     </div>
                     <button
@@ -216,93 +141,7 @@ export default function AdminSecurity() {
                     </button>
                 </div>
 
-                {/* 2. Recovery Key Section (Always visible, but action limited) */}
-                {!recoveryKey ? (
-                    <div className="bg-zinc-950/40 border border-white/5 rounded-[2rem] p-8 flex flex-col md:flex-row items-center gap-6">
-                        <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-zinc-500">
-                            <Key className="w-6 h-6" />
-                        </div>
-                        <div className="flex-1 space-y-1">
-                            <h4 className="text-sm font-bold">Emergency Recovery Key</h4>
-                            <p className="text-[10px] text-zinc-500 leading-normal">Generate a master key to regain control if your primary phone is lost.</p>
-                        </div>
-                        {onProtectedDevice && (
-                            <button
-                                onClick={generateRecoveryKey}
-                                className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest border border-white/5 transition-all"
-                            >
-                                Setup Recovery
-                            </button>
-                        )}
-                        {!onProtectedDevice && (
-                            <button
-                                onClick={() => setShowRescueForm(true)}
-                                className="px-6 py-3 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-indigo-500/20 transition-all flex items-center gap-2"
-                            >
-                                <LifeBuoy className="w-3.5 h-3.5" /> Lost Primary Device?
-                            </button>
-                        )}
-                    </div>
-                ) : (
-                    <div className="bg-indigo-600 border border-indigo-400/50 rounded-[2.5rem] p-8 space-y-6 shadow-2xl animate-in zoom-in-95">
-                        <div className="flex items-center gap-4">
-                            <AlertTriangle className="w-8 h-8 text-white animate-bounce" />
-                            <h4 className="text-lg font-black italic tracking-tight text-white m-0">WRITE THIS DOWN NOW!</h4>
-                        </div>
-                        <div className="bg-black/40 backdrop-blur-xl p-6 rounded-3xl border border-white/20 flex flex-col items-center gap-4">
-                            <span className="font-mono text-3xl font-black text-white tracking-[0.3em]">{recoveryKey}</span>
-                            <p className="text-[10px] text-white/60 font-medium uppercase tracking-widest text-center">
-                                This key will never be shown again. Use it to force-reset primary status if your phone is lost.
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => setRecoveryKey(null)}
-                            className="w-full py-4 bg-white text-black font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all active:scale-95"
-                        >
-                            I have saved it safely
-                        </button>
-                    </div>
-                )}
-
-                {/* 3. Emergency Rescue Form Modal-style */}
-                {showRescueForm && (
-                    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-2xl flex items-center justify-center p-6">
-                        <div className="bg-zinc-950 border border-white/10 rounded-[3rem] p-10 max-w-lg w-full space-y-8 shadow-[0_0_100px_rgba(99,102,241,0.2)]">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <h3 className="text-2xl font-black italic tracking-tight text-indigo-400">Emergency Rescue</h3>
-                                    <p className="text-xs text-zinc-500">Provide your Master Recovery Key to demote lost devices.</p>
-                                </div>
-                                <button onClick={() => setShowRescueForm(false)} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors">
-                                    <X className="w-5 h-5 text-zinc-500" />
-                                </button>
-                            </div>
-
-                            <div className="space-y-4">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Master Recovery Key</label>
-                                <input
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-xl font-mono tracking-[0.2em] outline-none focus:border-indigo-500 transition-all text-white h-16 placeholder:text-zinc-800"
-                                    placeholder="XXXX-XXXX-..."
-                                    value={rescueKeyInput}
-                                    onChange={e => setRescueKeyInput(e.target.value.toUpperCase())}
-                                />
-                            </div>
-
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={handleRescueReset}
-                                    className="flex-1 py-5 bg-indigo-500 hover:bg-indigo-400 text-black font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl transition-all shadow-[0_10px_30px_rgba(99,102,241,0.3)] active:scale-95 flex items-center justify-center gap-3"
-                                >
-                                    <LifeBuoy className="w-4 h-4" /> Force Reset Protection
-                                </button>
-                            </div>
-
-                            <p className="text-[10px] text-zinc-600 text-center uppercase tracking-widest font-bold">
-                                This will remove "Primary Locked" status from ALL other devices.
-                            </p>
-                        </div>
-                    </div>
-                )}
+                {/* 3. Emergency Rescue Form removed - integrated into Login */}
 
                 {/* 4. Sessions List */}
                 <div className="space-y-4">
@@ -375,14 +214,11 @@ export default function AdminSecurity() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2">
-                                    {onProtectedDevice && !session.is_protected && (
-                                        <button
-                                            onClick={() => promoteToPrimary(session.id)}
-                                            className="p-4 rounded-2xl bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest border border-indigo-500/20"
-                                        >
-                                            <Crown className="w-4 h-4" /> Upgrade
-                                        </button>
+                                <div className="flex items-center gap-2 text-right">
+                                    {session.is_protected && (
+                                        <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                                            <span className="text-[8px] font-black uppercase text-indigo-400 tracking-widest">SUPER ADMIN</span>
+                                        </div>
                                     )}
 
                                     {!session.is_current && !session.is_protected && (
