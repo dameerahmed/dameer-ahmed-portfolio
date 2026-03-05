@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Smartphone, Monitor, Globe, Clock, Trash2, Zap, ShieldCheck, Edit3, Check, X, ShieldAlert, Crown, Unlock, Key, AlertTriangle, LifeBuoy } from "lucide-react";
 import { AdminSection } from "@/components/admin/AdminUI";
 import { API, fetchWithAuth } from "@/lib/api";
@@ -23,6 +24,8 @@ export default function AdminSecurity() {
     const [editingId, setEditingId] = useState<number | null>(null);
     const [newName, setNewName] = useState("");
     const [newSecretCode, setNewSecretCode] = useState("");
+    const [otpCode, setOtpCode] = useState("");
+    const [updateStep, setUpdateStep] = useState(0); // 0: Input, 1: OTP
     const [isUpdatingCode, setIsUpdatingCode] = useState(false);
 
     const fetchSessions = async () => {
@@ -85,18 +88,40 @@ export default function AdminSecurity() {
 
         setIsUpdatingCode(true);
         try {
-            const res = await fetchWithAuth(`${API}/admin/recovery/update-code`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ new_code: newSecretCode.toUpperCase() })
-            });
-
-            if (res.ok) {
-                toast.success("Master Secret Code Updated!");
-                setNewSecretCode("");
+            if (updateStep === 0) {
+                // Step 1: Request OTP
+                const res = await fetchWithAuth(`${API}/admin/recovery/request-code-change`, {
+                    method: "POST"
+                });
+                if (res.ok) {
+                    toast.success("Verification code sent to your email!");
+                    setUpdateStep(1);
+                } else {
+                    const err = await res.json();
+                    toast.error(err.detail || "Request failed");
+                }
             } else {
-                const err = await res.json();
-                toast.error(err.detail || "Update failed");
+                // Step 2: Verify and Update
+                if (!otpCode) return toast.error("Please enter the verification code");
+
+                const res = await fetchWithAuth(`${API}/admin/recovery/update-code`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        new_code: newSecretCode.toUpperCase(),
+                        otp_code: otpCode
+                    })
+                });
+
+                if (res.ok) {
+                    toast.success("Master Secret Code Updated!");
+                    setNewSecretCode("");
+                    setOtpCode("");
+                    setUpdateStep(0);
+                } else {
+                    const err = await res.json();
+                    toast.error(err.detail || "Verification failed");
+                }
             }
         } catch (error) {
             toast.error("Network error updating code");
@@ -182,23 +207,53 @@ export default function AdminSecurity() {
 
                         <div className="flex flex-col md:flex-row gap-4 items-end">
                             <div className="flex-1 space-y-2 w-full">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">New Secret Code</label>
-                                <input
-                                    type="text"
-                                    value={newSecretCode}
-                                    onChange={e => setNewSecretCode(e.target.value.toUpperCase())}
-                                    placeholder="Enter new master key (min. 8 chars)"
-                                    className="w-full bg-black/40 border border-indigo-500/20 rounded-2xl p-4 text-white font-mono text-sm outline-none focus:border-indigo-500 transition-all"
-                                />
+                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+                                    {updateStep === 0 ? "New Secret Code" : "Enter Verification Code"}
+                                </label>
+                                {updateStep === 0 ? (
+                                    <input
+                                        type="text"
+                                        value={newSecretCode}
+                                        onChange={e => setNewSecretCode(e.target.value.toUpperCase())}
+                                        placeholder="Enter new master key (min. 8 chars)"
+                                        className="w-full bg-black/40 border border-indigo-500/20 rounded-2xl p-4 text-white font-mono text-sm outline-none focus:border-indigo-500 transition-all font-black tracking-widest"
+                                    />
+                                ) : (
+                                    <motion.input
+                                        initial={{ scale: 0.95, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        type="text"
+                                        maxLength={6}
+                                        value={otpCode}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setOtpCode(e.target.value)}
+                                        placeholder="000000"
+                                        className="w-full bg-indigo-500/10 border border-indigo-500/50 rounded-2xl p-4 text-center text-2xl font-black tracking-[0.5em] text-indigo-400 outline-none focus:border-indigo-400 transition-all shadow-[0_0_20px_rgba(99,102,241,0.1)]"
+                                    />
+                                )}
                             </div>
-                            <button
-                                onClick={updateSecretCode}
-                                disabled={isUpdatingCode}
-                                className="h-[52px] px-8 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-[0_10px_20px_rgba(99,102,241,0.2)] active:scale-95"
-                            >
-                                {isUpdatingCode ? "Updating..." : "Authorize Rotation"}
-                            </button>
+                            <div className="flex gap-2 w-full md:w-auto">
+                                {updateStep === 1 && (
+                                    <button
+                                        onClick={() => setUpdateStep(0)}
+                                        className="h-[52px] px-6 bg-white/5 hover:bg-white/10 text-zinc-400 rounded-2xl transition-all text-[10px] font-bold uppercase tracking-widest border border-white/5"
+                                    >
+                                        Back
+                                    </button>
+                                )}
+                                <button
+                                    onClick={updateSecretCode}
+                                    disabled={isUpdatingCode}
+                                    className="flex-1 md:flex-none h-[52px] px-8 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all shadow-[0_10px_20px_rgba(99,102,241,0.2)] active:scale-95"
+                                >
+                                    {isUpdatingCode ? "Processing..." : updateStep === 0 ? "Authorize Rotation" : "Confirm Update"}
+                                </button>
+                            </div>
                         </div>
+                        {updateStep === 1 && (
+                            <p className="text-[9px] text-indigo-400/60 font-medium italic text-center md:text-left">
+                                A 6-digit code has been sent to your registered admin email.
+                            </p>
+                        )}
                     </div>
                 )}
 

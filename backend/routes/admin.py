@@ -294,21 +294,65 @@ async def logout(request: Request, db: AsyncSession = Depends(get_db)):
     pass
 
 
-@router.put("/recovery/update-code")
-async def update_recovery_code(data: dict, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
-    from auth import get_password_hash
-    new_code = data.get("new_code")
-    if not new_code or len(new_code) < 8:
-        raise HTTPException(status_code=400, detail="New Secret Code must be at least 8 characters long.")
-
-    # 1. Restriction: Only Super Admins can update the code
+@router.post("/recovery/request-code-change")
+async def request_code_change(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    from utils.email import send_otp_email, generate_otp
+    
+    # 1. Restriction: Only Super Admins can request this
     curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
     current_session = curr_sess_res.scalars().first()
     
     if not current_session or not current_session.is_protected:
-        raise HTTPException(status_code=403, detail="Only a Super Admin session can update the Master Secret Code.")
+        raise HTTPException(status_code=403, detail="Unauthorized: Only a Super Admin can request a credential change.")
 
-    # 2. Update code for admin user
+    # 2. Generate and store OTP
+    otp_code = generate_otp()
+    expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=10)
+    
+    # Clear previous set OTPs if any
+    from sqlalchemy import delete
+    await db.execute(delete(models.AdminOTP))
+    
+    db_otp = models.AdminOTP(otp_code=otp_code, expires_at=expires_at)
+    db.add(db_otp)
+    await db.commit()
+
+    # 3. Send Email
+    success = send_otp_email(settings.ADMIN_EMAIL, otp_code)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to send verification email.")
+        
+    return {"message": "Verification code sent to your email."}
+
+
+@router.put("/recovery/update-code")
+async def update_recovery_code(data: dict, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    from auth import get_password_hash
+    new_code = data.get("new_code")
+    otp_code = data.get("otp_code")
+    
+    if not new_code or len(new_code) < 8:
+        raise HTTPException(status_code=400, detail="New Secret Code must be at least 8 characters long.")
+    if not otp_code:
+        raise HTTPException(status_code=400, detail="Verification code required.")
+
+    # 1. Restriction: Only Super Admins can update
+    curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
+    current_session = curr_sess_res.scalars().first()
+    
+    if not current_session or not current_session.is_protected:
+        raise HTTPException(status_code=403, detail="Unauthorized rotation.")
+
+    # 2. Verify OTP
+    otp_res = await db.execute(select(models.AdminOTP).where(models.AdminOTP.otp_code == otp_code))
+    db_otp = otp_res.scalars().first()
+    
+    if not db_otp:
+        raise HTTPException(status_code=401, detail="Invalid verification code.")
+    if db_otp.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+        raise HTTPException(status_code=401, detail="Verification code expired.")
+
+    # 3. Update code for admin user
     user_res = await db.execute(select(models.AdminUser).where(models.AdminUser.username == settings.ADMIN_USERNAME))
     admin_user = user_res.scalars().first()
     
@@ -316,6 +360,9 @@ async def update_recovery_code(data: dict, db: AsyncSession = Depends(get_db), c
         raise HTTPException(status_code=404, detail="Admin user not found.")
 
     admin_user.recovery_key = get_password_hash(new_code)
+    
+    # Cleanup OTP
+    await db.delete(db_otp)
     await db.commit()
     
     return {"message": "Master Secret Code updated successfully."}
