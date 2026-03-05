@@ -20,8 +20,19 @@ export default function LoginPage() {
     });
     const [showSecretField, setShowSecretField] = useState(false);
 
-    // Device ID check
     const deviceId = getDeviceId();
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const reason = params.get("reason");
+        if (reason === "session_ended") {
+            toast.error("Session terminated or expired. Please login again.", {
+                id: "session-error" // Prevent duplicates
+            });
+            // Clean URL
+            router.replace("/login");
+        }
+    }, [router]);
 
     const handleCredentialsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

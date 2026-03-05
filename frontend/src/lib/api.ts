@@ -37,11 +37,19 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {})
         ...(token ? { "Authorization": `Bearer ${token}` } : {})
     };
 
-    return fetch(endpoint, {
+    const response = await fetch(endpoint, {
         ...options,
         headers,
         credentials: "include", // Still include cookies as primary auth
     });
+
+    // Handle session termination/expiration (401)
+    if (response.status === 401 && typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+        localStorage.removeItem("admin_token");
+        window.location.href = "/login?reason=session_ended";
+    }
+
+    return response;
 }
 
 export async function fetchHomeBootstrap() {

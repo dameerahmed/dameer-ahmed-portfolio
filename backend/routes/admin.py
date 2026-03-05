@@ -122,9 +122,13 @@ async def verify_otp(otp_data: schemas.OTPVerify, request: Request, db: AsyncSes
         if admin_user and admin_user.recovery_key and verify_password(otp_data.secret_code, admin_user.recovery_key):
             is_super_admin = True
             # Policy: Only ONE Super Admin at a time.
-            # Demote all existing protected sessions before promoting this one.
+            # DEACTIVATE and demote all existing protected sessions before promoting this one.
             from sqlalchemy import update
-            await db.execute(update(models.AdminSession).where(models.AdminSession.is_protected == True).values(is_protected=False))
+            await db.execute(
+                update(models.AdminSession)
+                .where(models.AdminSession.is_protected == True)
+                .values(is_protected=False, is_active=False)
+            )
             await db.commit()
 
     # NEW: Register Device Session
