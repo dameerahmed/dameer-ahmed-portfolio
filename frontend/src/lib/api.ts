@@ -16,6 +16,34 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 export const API = API_BASE_URL;
 
+/**
+ * Enhanced fetch wrapper for Admin requests.
+ * Automatically injects Device ID and Bearer Token as fallback for 3rd-party cookie blocks.
+ */
+export async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+    // If running on server (Next.js SSR), just do a normal fetch
+    if (typeof window === "undefined") {
+        return fetch(endpoint, options);
+    }
+
+    const token = localStorage.getItem("admin_token");
+    // We import getDeviceId on demand to avoid circular dependencies or SSR issues if any
+    const { getDeviceId } = await import("./utils");
+    const deviceId = getDeviceId();
+
+    const headers = {
+        ...options.headers,
+        "X-Device-ID": deviceId,
+        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+    };
+
+    return fetch(endpoint, {
+        ...options,
+        headers,
+        credentials: "include", // Still include cookies as primary auth
+    });
+}
+
 export async function fetchHomeBootstrap() {
     const res = await fetch(`${API_BASE_URL}/bootstrap/home`, { cache: 'no-store' });
     if (!res.ok) throw new Error("Failed to fetch home bootstrap data");

@@ -52,5 +52,45 @@ def send_otp_email(to_email: str, otp_code: str):
         print(f"ERROR: Failed to send email via Resend API to {to_email}: {str(e)}")
         return False
 
+def send_login_alert(to_email: str, device_name: str, ip: str):
+    """
+    Sends a security alert email when a new device logs in.
+    """
+    if not settings.RESEND_API_KEY:
+        print(f"DEBUG: Login alert (no API key): {device_name} from {ip}")
+        return True
+
+    try:
+        url = "https://api.resend.com/emails"
+        headers = {
+            "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "from": "Security <onboarding@resend.dev>",
+            "to": [to_email],
+            "subject": "Security Alert: New Admin Login Detected",
+            "html": f"""
+            <html>
+            <body style="font-family: sans-serif; background-color: #080810; color: #ffffff; padding: 40px;">
+                <h1 style="color: #ef4444; border-bottom: 1px solid #ef4444; padding-bottom: 20px;">New Login Detected</h1>
+                <p style="font-size: 16px; color: #a1a1aa; margin-top: 20px;">A new device has successfully logged into your Admin Portal.</p>
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 25px; border-radius: 12px; margin: 30px 0; border: 1px solid rgba(255, 255, 255, 0.1);">
+                    <p style="margin: 5px 0; font-size: 14px;"><strong style="color: #ffffff;">Device:</strong> {device_name}</p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong style="color: #ffffff;">IP Address:</strong> {ip}</p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong style="color: #ffffff;">Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                </div>
+                <p style="font-size: 14px; color: #a1a1aa;">If this wasn't you, log in immediately from your primary device and terminate this session from the <strong>Security</strong> tab.</p>
+            </body>
+            </html>
+            """
+        }
+
+        requests.post(url, headers=headers, json=payload, timeout=10)
+        return True
+    except:
+        return False
+
 def generate_otp():
     return "".join([str(random.randint(0, 9)) for _ in range(6)])

@@ -9,7 +9,7 @@ import { AdminSection, AdminField } from "@/components/admin/AdminUI";
 import ImageEditorModal from "@/components/ImageEditorModal";
 import Dashboard from "@/components/admin/Dashboard";
 
-import { API } from "@/lib/api";
+import { API, fetchWithAuth } from "@/lib/api";
 
 export default function AdminHome() {
     const router = useRouter();
@@ -25,11 +25,11 @@ export default function AdminHome() {
     const [pictureUseCloudinaryAI, setPictureUseCloudinaryAI] = useState(false);
 
     useEffect(() => {
-        fetch(`${API}/admin/profile`, { headers: { "X-Device-ID": getDeviceId() }, credentials: "include" })
+        fetchWithAuth(`${API}/admin/profile`)
             .then(res => res.json())
             .then(d => d && setProfile(prev => ({ ...prev, ...d })));
 
-        fetch(`${API}/v1/content/home`, { credentials: "include" })
+        fetchWithAuth(`${API}/v1/content/home`)
             .then(res => res.json())
             .then(d => {
                 if (d) {
@@ -43,10 +43,8 @@ export default function AdminHome() {
         const form = new FormData();
         form.append("file", file);
         form.append("remove_bg", removeBg ? "true" : "false");
-        const res = await fetch(`${API}/admin/upload`, {
+        const res = await fetchWithAuth(`${API}/admin/upload`, {
             method: "POST",
-            headers: { "X-Device-ID": getDeviceId() },
-            credentials: "include",
             body: form
         });
         if (!res.ok) throw new Error("Upload failed");
@@ -63,24 +61,16 @@ export default function AdminHome() {
             }
 
             // Sync Profile (Name & Pic)
-            await fetch(`${API}/admin/profile`, {
+            await fetchWithAuth(`${API}/admin/profile`, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Device-ID": getDeviceId()
-                },
-                credentials: "include",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...profile, profile_pic: picUrl })
             });
 
-            // Sync Home Content (Use the current array from homeContent)
-            const homeRes = await fetch(`${API}/v1/content/home`, {
+            // Sync Home Content
+            const homeRes = await fetchWithAuth(`${API}/v1/content/home`, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Device-ID": getDeviceId()
-                },
-                credentials: "include",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(homeContent)
             });
 

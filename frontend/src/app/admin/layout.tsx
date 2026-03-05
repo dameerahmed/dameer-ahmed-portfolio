@@ -7,9 +7,8 @@ import {
     LogOut, MessageSquare, User, Zap,
     Clock, Briefcase, LayoutDashboard, Settings, Shield
 } from "lucide-react";
-import { getDeviceId } from "@/lib/utils";
 import { toast } from "react-hot-toast";
-import { API } from "@/lib/api";
+import { API, fetchWithAuth } from "@/lib/api";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -19,20 +18,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const checkAuth = useCallback(async () => {
         try {
-            const res = await fetch(`${API}/admin/me`, {
-                headers: { "X-Device-ID": getDeviceId() },
-                credentials: "include",
-            });
+            const res = await fetchWithAuth(`${API}/admin/me`);
             if (!res.ok) {
                 // Any non-200 response (401, 403, 500) = redirect
                 router.replace("/login");
                 return;
             }
             // Authenticated — now fetch unread count separately
-            const msgRes = await fetch(`${API}/admin/messages`, {
-                headers: { "X-Device-ID": getDeviceId() },
-                credentials: "include",
-            });
+            const msgRes = await fetchWithAuth(`${API}/admin/messages`);
             if (msgRes.ok) {
                 const messages = await msgRes.json();
                 if (Array.isArray(messages)) {
@@ -52,11 +45,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const handleLogout = async () => {
         try {
-            await fetch(`${API}/admin/logout`, { method: "POST", credentials: "include" });
+            await fetchWithAuth(`${API}/admin/logout`, { method: "POST" });
+            localStorage.removeItem("admin_token");
             toast.success("Session terminated.");
             router.replace("/");
         } catch {
-            toast.error("Logout failed.");
+            localStorage.removeItem("admin_token");
+            router.replace("/");
         }
     };
 

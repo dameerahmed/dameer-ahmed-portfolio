@@ -84,7 +84,7 @@ async def login(login_data: schemas.LoginData, request: Request, background_task
     return {"status": "otp_sent", "message": "Check your email for OTP"}
 
 @router.post("/verify-otp")
-async def verify_otp(otp_data: schemas.OTPVerify, db: AsyncSession = Depends(get_db)):
+async def verify_otp(otp_data: schemas.OTPVerify, request: Request, db: AsyncSession = Depends(get_db)):
     # Fetch OTP by code — do NOT reject wrong codes silently, track attempts
     result = await db.execute(select(models.AdminOTP).limit(1))
     db_otp = result.scalars().first()
@@ -113,6 +113,47 @@ async def verify_otp(otp_data: schemas.OTPVerify, db: AsyncSession = Depends(get
     await db.delete(db_otp)
     await db.commit()
 
+    # NEW: Register Device Session
+    ip = request.client.host if request.client else "unknown"
+    ua = request.headers.get("user-agent", "unknown")
+    
+    # Check if a session already exists for this device, or create a new one
+    sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == otp_data.device_id))
+    existing_session = sess_res.scalars().first()
+    
+    is_new_device = existing_session is None
+    
+    if existing_session:
+        existing_session.is_active = True
+        existing_session.ip_address = ip
+        existing_session.user_agent = ua
+        existing_session.last_active = datetime.now(timezone.utc).replace(tzinfo=None)
+    else:
+        # Check if this is the FIRST EVER session (to protect it by default)
+        count_res = await db.execute(select(models.AdminSession))
+        first_session = count_res.scalars().first() is None
+        
+        new_session = models.AdminSession(
+            device_id=otp_data.device_id,
+            ip_address=ip,
+            user_agent=ua,
+            last_active=datetime.now(timezone.utc).replace(tzinfo=None),
+            is_active=True,
+            is_protected=first_session # Auto-protect the very first device used
+        )
+        db.add(new_session)
+    
+    await db.commit()
+
+    # Trigger New Login Alert Email if it's a new device
+    if is_new_device:
+        from utils.email import send_login_alert
+        # Detect device type for the email
+        device_type = "Mobile" if "mobi" in ua.lower() else "Desktop"
+        browser = "Chrome" if "Chrome" in ua else "Safari" if "Safari" in ua else "Firefox" if "Firefox" in ua else "Browser"
+        display_name = f"{device_type} ({browser})"
+        background_tasks.add_task(send_login_alert, settings.ADMIN_EMAIL, display_name, ip)
+
     # Create 7-day token with Device ID
     access_token = create_access_token(
         data={"sub": settings.ADMIN_USERNAME, "device_id": otp_data.device_id},
@@ -120,10 +161,13 @@ async def verify_otp(otp_data: schemas.OTPVerify, db: AsyncSession = Depends(get
     )
 
     from fastapi import Response
-    response = Response(content='{"status": "ok"}', media_type="application/json")
+    import json
     
-    # Set HTTP-only Cookie
-    # secure=True in production (HTTPS), False in local dev
+    # Return token in body as fallback for cross-site cookie restrictions
+    content = json.dumps({"status": "ok", "access_token": access_token})
+    response = Response(content=content, media_type="application/json")
+    
+    # Set HTTP-only Cookie (Primary auth)
     is_production = not settings.FRONTEND_URL.startswith("http://localhost")
     response.set_cookie(
         key="admin_session",
@@ -136,11 +180,193 @@ async def verify_otp(otp_data: schemas.OTPVerify, db: AsyncSession = Depends(get
     
     return response
 
+@router.get("/admin/sessions")
+async def get_active_sessions(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    result = await db.execute(
+        select(models.AdminSession).where(models.AdminSession.is_active == True).order_by(models.AdminSession.last_active.desc())
+    )
+    sessions = result.scalars().all()
+    
+    current_device = current_admin.get("device_id")
+    serialized = []
+    for s in sessions:
+        serialized.append({
+            "id": s.id,
+            "device_id": s.device_id,
+            "ip_address": s.ip_address,
+            "user_agent": s.user_agent,
+            "last_active": s.last_active.isoformat() if s.last_active else None,
+            "is_current": s.device_id == current_device,
+            "is_protected": s.is_protected
+        })
+    return serialized
+
+@router.delete("/admin/sessions/{session_id}")
+async def terminate_session(session_id: int, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    result = await db.execute(select(models.AdminSession).where(models.AdminSession.id == session_id))
+    session = result.scalars().first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    if session.is_protected:
+        raise HTTPException(
+            status_code=403, 
+            detail="This is a Protected Primary Device. It cannot be remotely terminated.")
+    
+    session.is_active = False
+    await db.commit()
+    return {"message": "Session terminated"}
+
+@router.post("/admin/sessions/terminate-others")
+async def terminate_other_sessions(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    current_device = current_admin.get("device_id")
+    from sqlalchemy import update
+    await db.execute(
+        update(models.AdminSession)
+        .where(
+            models.AdminSession.device_id != current_device,
+            models.AdminSession.is_protected == False
+        )
+        .values(is_active=False)
+    )
+    await db.commit()
+    return {"message": "Other sessions terminated"}
+
+@router.put("/admin/sessions/{session_id}/name")
+async def update_device_name(session_id: int, name_data: dict, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    result = await db.execute(select(models.AdminSession).where(models.AdminSession.id == session_id))
+    session = result.scalars().first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session.device_name = name_data.get("name", "Unknown Device")
+    await db.commit()
+    return {"message": "Device name updated"}
+
+@router.put("/admin/sessions/{session_id}/promote")
+async def promote_session(session_id: int, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    # 1. Verify that the user doing the promotion is ALREADY on a protected device
+    # (Or if it's the very first time, handled in verify_otp)
+    curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
+    current_session = curr_sess_res.scalars().first()
+    
+    if not current_session or not current_session.is_protected:
+        raise HTTPException(status_code=403, detail="Only a Primary Protected device can authorize another primary device.")
+
+    # 2. Promote the target session
+    res = await db.execute(select(models.AdminSession).where(models.AdminSession.id == session_id))
+    target = res.scalars().first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Target session not found")
+    
+    target.is_protected = True
+    await db.commit()
+    return {"message": "Device promoted to Primary"}
+
+@router.put("/admin/sessions/{session_id}/demote")
+async def demote_session(session_id: int, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    # You can only demote yourself if you are protected, or another if you are protected
+    curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
+    current_session = curr_sess_res.scalars().first()
+    
+    if not current_session or not current_session.is_protected:
+        raise HTTPException(status_code=403, detail="Unauthorized demotion")
+
+    res = await db.execute(select(models.AdminSession).where(models.AdminSession.id == session_id))
+    target = res.scalars().first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    target.is_protected = False
+    await db.commit()
+    return {"message": "Primary status removed"}
+
+@router.get("/admin/recovery/get-key")
+async def get_recovery_key(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    import secrets
+    from auth import get_password_hash
+    
+    # 1. Only allow if current session is already protected (to prevent hijacking)
+    sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
+    session = sess_res.scalars().first()
+    if not session or not session.is_protected:
+        raise HTTPException(status_code=403, detail="Recovery key can only be generated from a Primary Protected device.")
+
+    # 2. Check if key already exists
+    user_res = await db.execute(select(models.AdminUser).where(models.AdminUser.username == settings.ADMIN_USERNAME))
+    admin_user = user_res.scalars().first()
+    
+    if not admin_user:
+        # Create user record if missing (using .env password as base)
+        admin_user = models.AdminUser(username=settings.ADMIN_USERNAME, hashed_password=get_password_hash(settings.ADMIN_PASSWORD))
+        db.add(admin_user)
+        await db.flush()
+
+    if admin_user.recovery_key:
+        return {"status": "already_set", "message": "Recovery key already exists. You must reset it if lost."}
+
+    # 3. Generate raw key
+    raw_key = secrets.token_hex(8).upper() # 16 chars
+    admin_user.recovery_key = get_password_hash(raw_key)
+    await db.commit()
+    
+    return {
+        "status": "success", 
+        "raw_key": raw_key, 
+        "warning": "IMPORTANT: Write this down! This will NOT be shown again. Use this to regain control if your phone is lost."
+    }
+
+@router.post("/admin/recovery/use-key")
+async def use_recovery_key(data: dict, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    from auth import verify_password
+    raw_key = data.get("key")
+    if not raw_key:
+        raise HTTPException(status_code=400, detail="Recovery key required")
+
+    user_res = await db.execute(select(models.AdminUser).where(models.AdminUser.username == settings.ADMIN_USERNAME))
+    admin_user = user_res.scalars().first()
+    
+    if not admin_user or not admin_user.recovery_key:
+        raise HTTPException(status_code=404, detail="No recovery key has been setup for this account.")
+
+    if not verify_password(raw_key, admin_user.recovery_key):
+        raise HTTPException(status_code=401, detail="Invalid Recovery Key")
+
+    # SUCCESS: Reset all protections and promote current
+    from sqlalchemy import update
+    await db.execute(update(models.AdminSession).values(is_protected=False))
+    
+    curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
+    current_session = curr_sess_res.scalars().first()
+    if current_session:
+        current_session.is_protected = True
+    
+    await db.commit()
+    return {"message": "Emergency Over: This device is now your Primary Locked device."}
+
 @router.post("/logout")
-async def logout():
+async def logout(request: Request, db: AsyncSession = Depends(get_db)):
+    # Try to find and deactivate the session
+    token = request.cookies.get("admin_session")
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            
+    if token:
+        payload = verify_access_token(token)
+        if payload and payload.get("device_id"):
+            from sqlalchemy import update
+            await db.execute(
+                update(models.AdminSession)
+                .where(models.AdminSession.device_id == payload.get("device_id"))
+                .values(is_active=False)
+            )
+            await db.commit()
+
     from fastapi import Response
     response = Response(content='{"status": "ok"}', media_type="application/json")
-    response.delete_cookie("admin_session")
+    response.delete_cookie("admin_session", samesite="none", secure=True)
     return response
 
 class ChangePasswordRequest(BaseModel):

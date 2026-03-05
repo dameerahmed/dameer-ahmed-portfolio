@@ -33,7 +33,7 @@ async def get_current_admin(request: Request):
     # Try to get token from HTTP-only cookie
     token = request.cookies.get("admin_session")
     
-    # Fallback to Authorization header for flexibility (if needed)
+    # Fallback to Authorization header
     if not token:
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
@@ -53,17 +53,38 @@ async def get_current_admin(request: Request):
             detail="Session expired or invalid",
         )
     
-    # Device ID Verification
     stored_device_id = payload.get("device_id")
     current_device_id = request.headers.get("X-Device-ID")
 
-    # If the token is bound to a device, the request MUST present a matching header.
-    # Missing header when token has a device_id = rejected (prevents token theft without device context).
     if stored_device_id:
         if not current_device_id or stored_device_id != current_device_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Session tied to another device",
             )
+
+    # NEW: Database Session Verification
+    from database import get_db_context
+    import models
+    from sqlalchemy.future import select
+
+    async with get_db_context() as db:
+        result = await db.execute(
+            select(models.AdminSession).where(
+                models.AdminSession.device_id == stored_device_id,
+                models.AdminSession.is_active == True
+            )
+        )
+        session = result.scalars().first()
+        
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session terminated or untracked",
+            )
+        
+        # Update last active timestamp
+        session.last_active = datetime.now(timezone.utc).replace(tzinfo=None)
+        await db.commit()
 
     return payload

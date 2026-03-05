@@ -64,6 +64,10 @@ export default function LoginPage() {
 
             const data = await res.json();
             if (res.ok) {
+                // Store token in localStorage as fallback for cross-site cookie blocks
+                if (data.access_token) {
+                    localStorage.setItem("admin_token", data.access_token);
+                }
                 toast.success("Access Granted. Welcome, Admin.");
                 router.push("/admin/home");
             } else {

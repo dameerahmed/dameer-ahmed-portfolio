@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, JSON
+from datetime import datetime, timezone
 from database import Base
 
 class AdminUser(Base):
@@ -6,6 +7,7 @@ class AdminUser(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
+    recovery_key = Column(String, nullable=True) # Hashed recovery key
 
 class AdminOTP(Base):
     __tablename__ = "admin_otps"
@@ -142,3 +144,15 @@ class Language(Base):
     name = Column(String)
     percentage = Column(Integer, default=100)
     level = Column(String, nullable=True) # e.g. 'Native', 'Fluent', 'Intermediate'
+
+class AdminSession(Base):
+    __tablename__ = "admin_sessions"
+    id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(String, index=True)
+    device_name = Column(String, nullable=True) # User-defined name
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    last_active = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
+    is_active = Column(Boolean, default=True)
+    is_protected = Column(Boolean, default=False) # Cannot be terminated by others
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
