@@ -121,10 +121,11 @@ async def verify_otp(otp_data: schemas.OTPVerify, request: Request, db: AsyncSes
         admin_user = user_res.scalars().first()
         if admin_user and admin_user.recovery_key and verify_password(otp_data.secret_code, admin_user.recovery_key):
             is_super_admin = True
-        else:
-            # If they provided a code but it's WRONG, we should probably warn them or just treat as normal
-            # For now, let's just keep as normal admin
-            pass
+            # Policy: Only ONE Super Admin at a time.
+            # Demote all existing protected sessions before promoting this one.
+            from sqlalchemy import update
+            await db.execute(update(models.AdminSession).where(models.AdminSession.is_protected == True).values(is_protected=False))
+            await db.commit()
 
     # NEW: Register Device Session
     ip = request.client.host if request.client else "unknown"
