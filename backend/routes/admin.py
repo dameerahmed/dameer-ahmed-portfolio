@@ -182,36 +182,61 @@ async def verify_otp(otp_data: schemas.OTPVerify, request: Request, db: AsyncSes
 
 @router.get("/admin/sessions")
 async def get_active_sessions(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
-    result = await db.execute(
-        select(models.AdminSession).where(models.AdminSession.is_active == True).order_by(models.AdminSession.last_active.desc())
-    )
-    sessions = result.scalars().all()
+    current_device_id = current_admin.get("device_id")
     
-    current_device = current_admin.get("device_id")
+    # 1. Get the session object of the requester
+    req_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_device_id))
+    requester_session = req_sess_res.scalars().first()
+    
+    if not requester_session:
+        return []
+
+    # 2. If protected, see all. If not, only see self.
+    if requester_session.is_protected:
+        result = await db.execute(
+            select(models.AdminSession).where(models.AdminSession.is_active == True).order_by(models.AdminSession.last_active.desc())
+        )
+        sessions = result.scalars().all()
+    else:
+        sessions = [requester_session]
+    
     serialized = []
     for s in sessions:
         serialized.append({
             "id": s.id,
             "device_id": s.device_id,
+            "device_name": s.device_name,
             "ip_address": s.ip_address,
             "user_agent": s.user_agent,
             "last_active": s.last_active.isoformat() if s.last_active else None,
-            "is_current": s.device_id == current_device,
+            "is_current": s.device_id == current_device_id,
             "is_protected": s.is_protected
         })
     return serialized
 
 @router.delete("/admin/sessions/{session_id}")
 async def terminate_session(session_id: int, db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    # 1. Check requester status
+    curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
+    requester = curr_sess_res.scalars().first()
+    
+    # 2. Get target session
     result = await db.execute(select(models.AdminSession).where(models.AdminSession.id == session_id))
     session = result.scalars().first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    if session.is_protected:
+    # 3. Restriction: Only protected device can terminate OTHERS. 
+    # Non-protected can only terminate self.
+    if not requester.is_protected and session.device_id != requester.device_id:
+        raise HTTPException(status_code=403, detail="Only a Primary device can terminate other sessions.")
+
+    # 4. Restriction: Protected sessions cannot be terminated via this endpoint (even by primary)
+    # except via the promote/demote flow or local logout.
+    if session.is_protected and session.device_id != requester.device_id:
         raise HTTPException(
             status_code=403, 
-            detail="This is a Protected Primary Device. It cannot be remotely terminated.")
+            detail="This is a Protected Primary Device. You cannot terminate it remotely.")
     
     session.is_active = False
     await db.commit()
@@ -219,6 +244,12 @@ async def terminate_session(session_id: int, db: AsyncSession = Depends(get_db),
 
 @router.post("/admin/sessions/terminate-others")
 async def terminate_other_sessions(db: AsyncSession = Depends(get_db), current_admin: dict = Depends(get_current_admin)):
+    # 1. Restriction: Only primary can use "Terminate All"
+    curr_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_admin.get("device_id")))
+    requester = curr_sess_res.scalars().first()
+    if not requester or not requester.is_protected:
+        raise HTTPException(status_code=403, detail="Only a Primary Protected device can terminate all others.")
+
     current_device = current_admin.get("device_id")
     from sqlalchemy import update
     await db.execute(
