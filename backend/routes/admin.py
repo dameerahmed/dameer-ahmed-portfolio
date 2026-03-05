@@ -188,16 +188,15 @@ async def get_active_sessions(db: AsyncSession = Depends(get_db), current_admin:
     req_sess_res = await db.execute(select(models.AdminSession).where(models.AdminSession.device_id == current_device_id))
     requester_session = req_sess_res.scalars().first()
     
-    if not requester_session:
-        return []
-
-    # 2. If protected, see all. If not, only see self.
-    if requester_session.is_protected:
+    # 2. If requester session not found (e.g. old ID or mismatch), 
+    # default to showing ALL active sessions for the admin.
+    if not requester_session or requester_session.is_protected:
         result = await db.execute(
             select(models.AdminSession).where(models.AdminSession.is_active == True).order_by(models.AdminSession.last_active.desc())
         )
         sessions = result.scalars().all()
     else:
+        # Only see self if not protected
         sessions = [requester_session]
     
     serialized = []
